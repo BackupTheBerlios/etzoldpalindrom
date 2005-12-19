@@ -1,9 +1,6 @@
 #include <iostream>
-#include <string>
 #include <assert.h>
 #include <pthread.h>
-#include <gmp.h>
-
 #include "libpal.hh"
 #include "number_generator.hh"
 
@@ -30,22 +27,18 @@ int main( int argc, char** argv ) {
 
 	pthread_attr_t attr;
 	pthread_t thread;
-
 	pthread_attr_init( &attr );
 	assert( pthread_create( &thread, &attr, timer, NULL ) == 0 );
 
-	mpz_t p;
-	mpz_t c;
+	mpz_t p, c;
 	mpz_init( p );
 	mpz_init( c );
 
 	for( int len = atoi( argv[ 1 ] ); ; len = ( len << 1 ) + 1 ) {
-		number_generator gen( len );
 		char* tmp = new char[ 2 * len + 128 ];
-
+		number_generator gen( len );
 		std::cout << "testing length: " << len << std::endl;
 		gen.first_number( p );
-
 		do {
 			mpz_mul( c, p, p );
 			mpz_get_str( tmp, 10, c );
@@ -60,7 +53,6 @@ int main( int argc, char** argv ) {
 				std::cout << "_" << std::flush;
 			}
 		} while( ! gen.next_number( p ) );
-
 		delete[] tmp;
 	}
 }
