@@ -1,14 +1,17 @@
 #include <iostream>
+#include <fstream>
 #include <vector>
 #include <sstream>
+#include <unistd.h>
 
 #include "libpal.hh"
 #include "settings.hh"
 #include "socket.hh"
 #include "number_generator.hh"
+#include "args.hh"
 
 typedef struct {
-	const char* email;
+	std::string email;
 } config_t;
 
 typedef struct {
@@ -22,17 +25,45 @@ typedef struct {
 	u_int32_t chksum;
 } data_t;
 
-config_t c;
+std::string _version = CLIENT_VERSION;
+std::string _srv = SRV_ADDR;
+bool        _ip = false;
+int         _port = SRV_PORT;
 
-void read_config( config_t* c );
-void loop();
+void read_config( config_t& c );
+void write_config( const config_t& c );
+void loop( const config_t& c );
 bool parse_line( const std::string& s, data_t* d );
 std::string check( const data_t& data );
 void send_palindrom( int fd, const std::string& n, const std::string& id, int retries = 10 );
 
 int main( int argc, char** argv ) {
-	read_config( &c );
-	loop();
+	config_t conf;
+
+	if( arg_exists( argc, argv, "--hostip" ) ) {
+		_srv = arg_value( argc, argv, "--hostip" );
+		_ip = true;
+	}
+	if( arg_exists( argc, argv, "--port" ) ) {
+		_port = atoi( arg_value( argc, argv, "--port" ) );
+	}
+
+	std::cout << "etzoldpal " << _version << std::endl;
+	read_config( conf );
+	std::cout << "using email " << conf.email << std::endl;
+
+	if( ! arg_exists( argc, argv, "-f" ) ) {  // daemonize
+		pid_t p = fork();
+		if( p > 0 ) {
+			std::cout << "child process " << p << std::endl;
+			exit( 0 );
+		} else if( p == -1 ) {
+			std::cerr << "Could not switch into background." << std::endl;
+			exit( 1 );
+		}
+	}
+
+	loop( conf );
 }
 
 bool parse_line( const std::string& s, data_t* d ) {
@@ -70,14 +101,37 @@ bool parse_line( const std::string& s, data_t* d ) {
 	return ret;
 }
 
-void read_config( config_t* c ) {
-	memset( c, 0, sizeof( config_t ) );
-	FILE* f = fopen( CONFIG_FILE, "r" );
-	if( f ) {
-		// TODO
-		fclose( f );
+void write_config( config_t& c ) {
+	std::ofstream f( CONFIG_FILE, std::ios::trunc );
+	if( ! f.is_open() || f.fail() ) {
+		std::cerr << "Could not open configuration file " << CONFIG_FILE << " for writing." << std::endl;
+		exit( 1 );
+	}
+	f << "email: " << c.email << std::endl;
+}
+
+void read_config( config_t& c ) {
+	std::ifstream f( CONFIG_FILE );
+	std::string s;
+	if( ! f.is_open() || f.fail() ) {
+		printf( 
+			"No configuration file was found.\n"
+			"Email address: " );
+		fflush( stdout );
+		std::getline( std::cin, c.email );
+		write_config( c );
 	} else {
-		c->email = "no@email.set";
+		while( std::getline( f, s ) ) {
+			std::string::size_type p = s.find( ": " );
+			if( p != std::string::npos ) {
+				std::string key = s.substr( 0, p );
+				std::string val = s.substr( p );
+				val.erase( 0, 2 );
+				if( key == "email" ) {
+					c.email = val;
+				}
+			}
+		}
 	}
 }
 
@@ -98,19 +152,13 @@ std::string check( const data_t& data ) {
 	for( int n = 0; n < data.n; ++n ) {
 		mpz_mul( c, p, p );
 		mpz_get_str( tmp, 10, c );
-		if( is_palindrom( tmp ) ) {
-			if( mpz_probab_prime_p( p, 10 ) > 0 ) {
-				printf( "%s = ", tmp );
-				mpz_get_str( tmp, 10, p );
-				printf( "%s\n", tmp );
-				r = tmp;
-				break;
-			}
-		}
-		if( gen.next_number( p ) ) {
+		if( is_palindrom( tmp ) && mpz_probab_prime_p( p, 10 ) > 0 ) {
+			r = tmp;
 			break;
 		}
+		if( gen.next_number( p ) ) break;
 	}
+	delete[] tmp;
 	mpz_clear( c );
 	mpz_clear( p );
 	return r;
@@ -126,12 +174,12 @@ void send_palindrom( int fd, const std::string& n, const std::string& id, int re
 	}
 }
 
-void loop() {
+void loop( const config_t& c ) {
 	std::string id;
 	std::string r;
 	while( true ) {
 		int fd;
-		if( ( fd = connect_socket( SRV_ADDR, SRV_PORT ) ) != -1 ) {
+		if( ( fd = connect_socket( _srv.c_str(), _port, _ip ? false : true ) ) != -1 ) {
 			if( ! r.empty() ) {
 				send_palindrom( fd, r, id );
 				r = "";

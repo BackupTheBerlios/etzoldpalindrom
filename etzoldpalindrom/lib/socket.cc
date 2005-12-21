@@ -111,21 +111,27 @@ bool send_line( int fd, const std::string& s ) {
 	return true;
 }
 
-int connect_socket( const char* srv, int port ) {
+int connect_socket( const char* srv, int port, bool resolvehost ) {
 	int fd = -1;
-	struct hostent* h = gethostbyname( srv );
-	if( h != NULL ) {
-		char* ip = inet_ntoa( *( (struct in_addr *) h->h_addr ) );
-		struct sockaddr_in dest_addr;
-		if( ( fd = socket( AF_INET, SOCK_STREAM, 0 ) ) != -1 ) {
-			memset( &dest_addr, 0, sizeof( dest_addr ) );
-			dest_addr.sin_family = AF_INET;
-			dest_addr.sin_port = htons( port );
-			dest_addr.sin_addr.s_addr = inet_addr( ip );
-			if( connect( fd, (struct sockaddr *)&dest_addr, sizeof( struct sockaddr ) ) == -1 ) {
-				close( fd );
-				return -1;
-			}
+	const char* ip;
+	if( resolvehost ) {
+		struct hostent* h = gethostbyname( srv );
+		if( h == NULL ) {
+			return -1;
+		}
+		ip = inet_ntoa( *( (struct in_addr *) h->h_addr ) );
+	} else {
+		ip = srv;
+	}
+	struct sockaddr_in dest_addr;
+	if( ( fd = socket( AF_INET, SOCK_STREAM, 0 ) ) != -1 ) {
+		memset( &dest_addr, 0, sizeof( dest_addr ) );
+		dest_addr.sin_family = AF_INET;
+		dest_addr.sin_port = htons( port );
+		dest_addr.sin_addr.s_addr = inet_addr( ip );
+		if( connect( fd, (struct sockaddr *)&dest_addr, sizeof( struct sockaddr ) ) == -1 ) {
+			close( fd );
+			return -1;
 		}
 	}
 	return fd;
