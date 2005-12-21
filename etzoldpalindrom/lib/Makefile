@@ -1,7 +1,7 @@
 TARGETS = libpal.a
 CXX     = g++
 INCS    =
-OBJS    = libpal.o number_generator.o args.o
+OBJS    = libpal.o number_generator.o args.o socket.o
 
 all: $(TARGETS)
 

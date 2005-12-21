@@ -1,10 +1,11 @@
 #include "socket.hh"
-
+#include <iostream>
 #include <cstring>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <netdb.h>
 #include <unistd.h>
 #include <errno.h>
 #include <cstdio>
@@ -93,16 +94,41 @@ int accept_socket( int sock ) {
 }
 
 
-void send_line( int fd, const std::string& s ) {
+bool send_line( int fd, const std::string& s ) {
 	unsigned int bytessend = 0;
 	unsigned int tosend = s.size();
 	while( bytessend < s.size() ) {
 		int r = send( fd, s.c_str() + bytessend, tosend, MSG_NOSIGNAL );
 		if( r == -1 ) {  // error
-			return;
+			return false;
 		}
 		bytessend += r;
 		tosend -= r;
 	}
-	send( fd, "\n", 1, MSG_NOSIGNAL );
+	if( send( fd, "\n", 1, MSG_NOSIGNAL ) == -1 ) {
+		return false;
+	}
+	return true;
 }
+
+int connect_socket( const char* srv, int port ) {
+	int fd = -1;
+	struct hostent* h = gethostbyname( srv );
+	if( h != NULL ) {
+		char* ip = inet_ntoa( *( (struct in_addr *) h->h_addr ) );
+		struct sockaddr_in dest_addr;
+		if( ( fd = socket( AF_INET, SOCK_STREAM, 0 ) ) != -1 ) {
+			memset( &dest_addr, 0, sizeof( dest_addr ) );
+			dest_addr.sin_family = AF_INET;
+			dest_addr.sin_port = htons( port );
+			dest_addr.sin_addr.s_addr = inet_addr( ip );
+			if( connect( fd, (struct sockaddr *)&dest_addr, sizeof( struct sockaddr ) ) == -1 ) {
+				close( fd );
+				return -1;
+			}
+		}
+	}
+	return fd;
+}
+
+

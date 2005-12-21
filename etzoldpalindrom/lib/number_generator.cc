@@ -3,6 +3,23 @@
 #include <stdlib.h>
 #include <assert.h>
 
+number_generator::number_generator( const std::string& num ) {
+	mpz_init( tmp );
+	ones = 0;
+	buf = new int[ num.size() ];
+	cap = (int) num.size();
+
+	memset( buf, 0, cap * sizeof( int ) );
+	buf[ 0 ] = buf[ cap - 1 ] = 1;
+	ones = 0;
+	for( unsigned i = 0; i < num.size(); ++i ) {
+		if( num[ i ] == '1' ) {
+			buf[ num.size() - 1 - i ] = 1;
+			if( i > 0 && i < num.size() / 2 ) ++ones;
+		}
+	}
+}
+
 number_generator::number_generator( int len ) {
 	mpz_init( tmp );
 	ones = 0;

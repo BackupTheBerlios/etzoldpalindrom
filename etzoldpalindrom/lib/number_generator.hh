@@ -1,11 +1,13 @@
 #ifndef NUMBER_GENERATOR_HH
 #define NUMBER_GENERATOR_HH
 
+#include <string>
 #include <gmp.h>
 
 class number_generator {
 public:
 	number_generator( int len );
+	number_generator( const std::string& num );
 	virtual ~number_generator();
 
 	void first_number( mpz_t r );

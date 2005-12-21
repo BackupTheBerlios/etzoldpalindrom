@@ -1,12 +1,13 @@
-TARGETS = srv
+TARGETS = client
 CXX     = g++
 INCS    = -I../lib -I..
 LIBS    = /usr/lib/libgmp.a -lpthread
 
 all: $(TARGETS)
 
-srv: srv.o ../lib/libpal.a
+client: client.o ../lib/libpal.a
 	$(CXX) $< ../lib/libpal.a $(LIBS) -o $@
+	$(CXX) -static $< ../lib/libpal.a $(LIBS) -o client_static
 
 %.o: %.cc
 	$(CXX) -c -O2 $(INCS) $<

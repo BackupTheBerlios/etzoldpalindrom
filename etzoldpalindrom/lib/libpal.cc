@@ -93,6 +93,27 @@ void compact( const std::string& p, std::string& out, const char* up, const char
 	}
 }
 
+void decompact( const std::string& p, std::string& d ) {
+	if( ! p.empty() ) {
+		std::stringstream s;
+		for( std::string::size_type i = 0; i < p.size(); ++i ) {
+			if( p[ i ] == '^' ) {
+				char l = ( i > 0 ? p[ i - 1 ] : '.' );
+				std::string::size_type x = ++i;
+				for( ; i < p.size() && ! isspace( p[ i ] ); ++i );
+				if( x < p.size() ) {
+					for( int n = atoi( p.substr( x, i - x ).c_str() ) - 1; n; --n ) {
+						s << l;
+					}
+				}
+			} else {
+				s << p[ i ];
+			}
+		}
+		d = s.str();
+	}
+}
+
 u_int32_t chksum( const std::string& s ) {
 	u_int32_t r = 0;
 	for( unsigned int i = 0; i < s.size(); ++i ) {
