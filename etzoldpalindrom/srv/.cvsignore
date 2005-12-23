@@ -1,2 +1,5 @@
+epalsrv
+epalsrv_static
+*.log
 log
 srv

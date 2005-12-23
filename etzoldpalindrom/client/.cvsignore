@@ -1,3 +1,5 @@
+*.swp
+config
 epal
 epal_static
 log
