@@ -9,9 +9,11 @@
 #include "socket.hh"
 #include "number_generator.hh"
 #include "args.hh"
+#include "sha2.hh"
 
 typedef struct {
 	std::string email;
+	std::string pwd;
 } config_t;
 
 typedef struct {
@@ -101,6 +103,16 @@ bool parse_line( const std::string& s, data_t* d ) {
 	return ret;
 }
 
+std::string hexdump( const unsigned char* data, int len ) {
+	std::string r;
+	char buf[ 3 ];
+	for( ; len > 0; --len, ++data ) {
+		snprintf( buf, 2, "%02x", *data );
+		r += buf;
+	}
+	return r;
+}
+
 void write_config( config_t& c ) {
 	std::ofstream f( CONFIG_FILE, std::ios::trunc );
 	if( ! f.is_open() || f.fail() ) {
@@ -108,9 +120,11 @@ void write_config( config_t& c ) {
 		exit( 1 );
 	}
 	f << "email: " << c.email << std::endl;
+	f << "pwd: " << c.pwd << std::endl;
 }
 
 void read_config( config_t& c ) {
+	unsigned char dig[ SHA512_DIGEST_SIZE ];
 	std::ifstream f( CONFIG_FILE );
 	std::string s;
 	if( ! f.is_open() || f.fail() ) {
@@ -119,6 +133,13 @@ void read_config( config_t& c ) {
 			"Email address: " );
 		fflush( stdout );
 		std::getline( std::cin, c.email );
+		do {
+			printf( "Password (at least 6 characters): " );
+			fflush( stdout );
+			std::getline( std::cin, s );
+		} while( s.size() < 6 );
+		sha512( (unsigned char*) s.data(), s.size(), dig );
+		c.pwd = hexdump( dig, SHA512_DIGEST_SIZE );
 		write_config( c );
 	} else {
 		while( std::getline( f, s ) ) {
@@ -129,6 +150,8 @@ void read_config( config_t& c ) {
 				val.erase( 0, 2 );
 				if( key == "email" ) {
 					c.email = val;
+				} else if( key == "pwd" ) {
+					c.pwd = val;
 				}
 			}
 		}
