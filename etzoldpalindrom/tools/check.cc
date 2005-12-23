@@ -7,12 +7,6 @@
 #define DIGITS( o ) \
 	std::cout << "digits: " << p.size() << std::endl;
 
-class millerrabin_threaded {
-public:
-	millerrabin_threaded( int threads );
-protected:
-};
-
 int check_prime( const std::string& p, int iterations = DEFAULT_PRIME_ITERATIONS ) {
 	int r = 0;
 	DIGITS( p )
