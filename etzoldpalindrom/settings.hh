@@ -30,7 +30,15 @@
 #endif
 
 #ifndef MAX_REQUESTS_PER_MINUTE
-#define MAX_REQUESTS_PER_MINUTE
+#define MAX_REQUESTS_PER_MINUTE 5
+#endif
+
+#ifndef SRV_LOG_FILE
+#define SRV_LOG_FILE "epalsrv"
+#endif
+
+#ifndef SRV_DATA_PATH
+#define SRV_DATA_PATH "."
 #endif
 
 #endif
