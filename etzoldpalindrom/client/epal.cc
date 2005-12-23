@@ -12,7 +12,7 @@
 #include "sha2.hh"
 
 typedef struct {
-	std::string email;
+	std::string nick;
 	std::string pwd;
 } config_t;
 
@@ -52,7 +52,7 @@ int main( int argc, char** argv ) {
 
 	std::cout << "etzoldpal " << _version << std::endl;
 	read_config( conf );
-	std::cout << "using email " << conf.email << std::endl;
+	std::cout << "using nick " << conf.nick << std::endl;
 
 	if( ! arg_exists( argc, argv, "-f" ) ) {  // daemonize
 		pid_t p = fork();
@@ -119,7 +119,7 @@ void write_config( config_t& c ) {
 		std::cerr << "Could not open configuration file " << CONFIG_FILE << " for writing." << std::endl;
 		exit( 1 );
 	}
-	f << "email: " << c.email << std::endl;
+	f << "nick: " << c.nick << std::endl;
 	f << "pwd: " << c.pwd << std::endl;
 }
 
@@ -130,9 +130,9 @@ void read_config( config_t& c ) {
 	if( ! f.is_open() || f.fail() ) {
 		printf( 
 			"No configuration file was found.\n"
-			"Email address: " );
+			"Nick or real name: " );
 		fflush( stdout );
-		std::getline( std::cin, c.email );
+		std::getline( std::cin, c.nick );
 		do {
 			printf( "Password (at least 6 characters): " );
 			fflush( stdout );
@@ -148,8 +148,8 @@ void read_config( config_t& c ) {
 				std::string key = s.substr( 0, p );
 				std::string val = s.substr( p );
 				val.erase( 0, 2 );
-				if( key == "email" ) {
-					c.email = val;
+				if( key == "nick" ) {
+					c.nick = val;
 				} else if( key == "pwd" ) {
 					c.pwd = val;
 				}
@@ -210,7 +210,7 @@ void loop( const config_t& c ) {
 			} else {
 				std::stringstream s;
 				std::string buf;
-				s << "G " << CLIENT_VERSION << " [" << c.email << "]";
+				s << "G " << CLIENT_VERSION << " [" << c.nick << "]";
 				if( send_line( fd, s.str() ) && read_line( fd, buf ) ) {
 					data_t data;
 					close( fd );
