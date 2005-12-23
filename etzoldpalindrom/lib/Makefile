@@ -1,7 +1,7 @@
 TARGETS = libpal.a
 CXX     = g++
-INCS    =
-OBJS    = libpal.o number_generator.o args.o socket.o logging.o sha2.o
+INCS    = -I..
+OBJS    = libpal.o number_generator.o args.o socket.o logging.o sha2.o diffie_hellman.o
 
 all: $(TARGETS)
 
