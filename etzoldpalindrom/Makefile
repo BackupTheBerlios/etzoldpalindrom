@@ -1,4 +1,4 @@
-DIRS = lib tools srv client
+DIRS = lib tools srv client tests
 
 all:
 	@for i in $(DIRS); do make -C $$i; done
