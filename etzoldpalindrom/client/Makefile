@@ -1,13 +1,15 @@
-TARGETS = client
+TARGETS = epal epal_static
 CXX     = g++
 INCS    = -I../lib -I..
 LIBS    = /usr/lib/libgmp.a -lpthread
 
 all: $(TARGETS)
 
-client: client.o ../lib/libpal.a
+epal: epal.o ../lib/libpal.a
 	$(CXX) $< ../lib/libpal.a $(LIBS) -o $@
-	$(CXX) -static $< ../lib/libpal.a $(LIBS) -o client_static
+
+epal_static: epal.o ../lib/libpal.a
+	$(CXX) -static $< ../lib/libpal.a $(LIBS) -o $@
 
 %.o: %.cc
 	$(CXX) -c -O2 $(INCS) $<

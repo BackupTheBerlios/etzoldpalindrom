@@ -29,5 +29,9 @@
 #define NUMBERS 10
 #endif
 
+#ifndef MAX_REQUESTS_PER_MINUTE
+#define MAX_REQUESTS_PER_MINUTE
+#endif
+
 #endif
 
