@@ -1,7 +1,7 @@
 TARGETS = test_diffie_hellman
 CXX     = g++
 INCS    = -I../lib
-LIBS    = -lgmp -lpthread
+LIBS    = -lgmp -lpthread -lssl
 
 all: $(TARGETS)
 
