@@ -2,6 +2,7 @@
 #define DIFFIE_HELLMAN_HH
 
 #include <gmp.h>
+#include <openssl/des.h>
 
 class diffie_hellman {
 public:
@@ -19,6 +20,8 @@ public:
 		\param k Receives the session key and must be initialized by the caller.
 	*/
 	void session_key( mpz_t k );
+
+	void diffie_hellman::get_des3_key( DES_cblock k1, DES_cblock k2, DES_cblock k3 );
 
 protected:
 	mpz_t n;
