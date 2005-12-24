@@ -2,13 +2,33 @@
 #define SOCKET_HH
 
 #include <string>
+#include <openssl/ssl.h>
+
+class socket {
+public:
+	socket( int fd );
+	socket();
+	virtual ~socket();
+	
+	void close();
+	void set_fd( int fd );
+	std::string get_ip() const;
+	bool read_line( std::string& s, unsigned int maxlen = 1024, int timeout = 30 ) const;
+	bool send_line( const std::string& s ) const;
+	bool connect_socket( const std::string& srv, int port, bool resolvehost = true );
+	bool ssl();
+	bool ssl_init( bool client = true );
+
+	static std::string get_ip( int fd );
+protected:
+	int _fd;
+	SSL_CTX* _ctx;
+	SSL* _ssl;
+	bool _sslclient;
+};
 
 int init_socket( int port, int queue = 100 );
 int accept_socket( int sock );
-std::string get_ip( int fd );
-bool read_line( int fd, std::string& s, unsigned int maxlen = 1024, int timeout = 30 );
-bool send_line( int fd, const std::string& s );
-int connect_socket( const char* srv, int port, bool resolvehost = true );
 
 #endif
 
