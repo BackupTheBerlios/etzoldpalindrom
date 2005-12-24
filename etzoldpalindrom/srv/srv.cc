@@ -17,7 +17,7 @@
 #define INC_LENGTH( x ) ( x * 2 + 1 )
 
 logging     _log( SRV_LOG_FILE, logging::_debug );
-std::stirng _data_path = SRV_DATA_PATH;
+std::string _data_path = SRV_DATA_PATH;
 
 std::string get_id( int len = 10 );
 bool        check_ip( const std::string& ip );
@@ -29,7 +29,6 @@ int main( int argc, char** argv ) {
 	if( arg_exists( argc, argv, "--len" ) ) {
 		len = atoi( arg_value( argc, argv, "--len" ) );
 	}
-
 	if( arg_exists( argc, argv, "--datapath" ) ) {
 		_data_path = arg_value( argc, argv, "--datapath" );
 	}
@@ -52,21 +51,23 @@ int main( int argc, char** argv ) {
 }
 
 int get_next_fd( int sock ) {
+	int fd;
 	while( true ) {
-		int fd;
-		std::string ip;
 		assert( ( fd = accept_socket( sock ) ) != -1 );
-		if( check_ip( ip = get_ip( fd ) ) ) {
+		if( check_ip( socket::get_ip( fd ) ) ) {
 			break;
 		}
 		close( fd );
 	}
+	return fd;
 }
 
-void loop( int len, int sock ) {
+void loop( int len, int soc ) {
 	mpz_t x;
 	mpz_init( x );
 	_log.notice( "listening on port [%d] ...", SRV_PORT );
+	socket sock;
+	sock.ssl_init( false );
 	for( ; ; len = INC_LENGTH( len ) ) {
 		_log.notice( "len = [%d]", len );
 		number_generator gen( len );
@@ -75,28 +76,32 @@ void loop( int len, int sock ) {
 		char* tmp = new char[ len + 128 ];
 		do {
 			std::string s, ip;
-			int fd = get_next_fd( sock );
-
-			read_line( fd, s );
-			_log.notice( "rcv: [%s] on [%d], line [%s]", ip.c_str(), time( NULL ), s.c_str() );
-			if( ! s.empty() ) {
-				switch( s[ 0 ] ) {
-					case 'F':      // client found an etzold palindrom
-						close( fd );
-						break;
-					case 'G':
-						mpz_get_str( tmp, 10, x );
-						compact( tmp, s );
-						std::stringstream out;
-						out << ip << " " << time( NULL ) << " 1.0 " << NUMBERS << " " << len << " [" << s << "] " << get_id();
-						u_int32_t chk = chksum( out.str() );
-						out << " " << chk;
-						_log.notice( "snd: [%s]", out.str().c_str() );
-						send_line( fd, out.str() );
+			sock.set_fd( get_next_fd( soc ) );
+			if( sock.ssl() ) {
+				sock.read_line( s, 1024, 10 );
+				ip = sock.get_ip();
+				_log.notice( "rcv: [%s] on [%d], line [%s]", ip.c_str(), time( NULL ), s.c_str() );
+				if( ! s.empty() ) {
+					switch( s[ 0 ] ) {
+						case 'F':      // client found an etzold palindrom
+							sock.close();
+							break;
+						case 'G':
+							mpz_get_str( tmp, 10, x );
+							compact( tmp, s );
+							std::stringstream out;
+							out << ip << " " << time( NULL ) << " 1.0 " << NUMBERS << " " << len << " [" << s << "] " << get_id();
+							u_int32_t chk = chksum( out.str() );
+							out << " " << chk;
+							_log.notice( "snd: [%s]", out.str().c_str() );
+							sock.send_line( out.str() );
+					}
 				}
+			} else {
+				_log.error( "ssl failed [%s] on [%d]", ip.c_str(), time( NULL ) );
 			}
+			sock.close();
 			_log.debug( "close connection [%s] on [%d]", ip.c_str(), time( NULL ) );
-			close( fd );
 		} while( ! gen.next_number( x, NUMBERS ) );
 		delete[] tmp;
 	}
