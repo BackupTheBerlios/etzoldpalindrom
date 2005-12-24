@@ -5,7 +5,7 @@
 #include "args.hh"
 
 #define DIGITS( o ) \
-	std::cout << "digits: " << p.size() << std::endl;
+	std::cout << "digits: " << o.size() << std::endl;
 
 int check_prime( const std::string& p, int iterations = DEFAULT_PRIME_ITERATIONS ) {
 	int r = 0;
@@ -33,15 +33,32 @@ int check_palindrom( const std::string& p ) {
 	return r;
 }
 
-int to_compact( const std::string& p, const char* up = "^", const char* down = " " ) {
+int to_compact( const std::string& p, bool html = false ) {
 	std::string x;
-	compact( p, x, up, down );
+	compact( p, x, html ? "<sup>" : "^", html ? "</sup>" : " " );
 	std::cout << x << std::endl;
 	return 0;
 }
 
-int to_compact_html( const std::string& p ) {
-	return to_compact( p, "<sup>", "</sup>" );
+int to_decompact( const std::string& p ) {
+	std::string l;
+	decompact( p, l );
+	std::cout << l << std::endl;
+	return 0;
+}
+
+int to_sqr( const std::string& p, bool html = false ) {
+	std::string r;
+	DIGITS( p );
+	to_compact( p, html );
+	mpz_t x;
+	mpz_t y;
+	mpz_init_set_str( x, p.c_str(), 10 );
+	mpz_init( y );
+	mpz_mul( y, x, x );
+	r = mpz_get_str( NULL, 10, y );
+	DIGITS( r );
+	return to_compact( r, html );
 }
 
 int main( int argc, char** argv ) {
@@ -66,11 +83,17 @@ int main( int argc, char** argv ) {
 	}
 
 	if( arg_exists( argc, argv, "--compact" ) ) {
-		return to_compact( val.empty() ? arg_value( argc, argv, "--compact" ) : val );
+		return to_compact( val.empty() ? arg_value( argc, argv, "--compact" ) : val,
+			arg_exists( argc, argv, "--html" ) );
 	}
 
-	if( arg_exists( argc, argv, "--compacthtml" ) ) {
-		return to_compact_html( val.empty() ? arg_value( argc, argv, "--compact_html" ) : val );
+	if( arg_exists( argc, argv, "--decompact" ) ) {
+		return to_decompact( val.empty() ? arg_value( argc, argv, "--decompact" ) : val );
+	}
+
+	if( arg_exists( argc, argv, "--sqr" ) ) {
+		return to_sqr( val.empty() ? arg_value( argc, argv, "--sqr" ) : val, 
+			arg_exists( argc, argv, "--html" ) );
 	}
 }
 
