@@ -10,7 +10,7 @@
 #endif
 
 #ifndef SRV_RETRY
-#define SRV_RETRY 2
+#define SRV_RETRY 30
 #endif
 
 #ifndef CLIENT_VERSION
@@ -30,7 +30,7 @@
 #endif
 
 #ifndef MAX_REQUESTS_PER_MINUTE
-#define MAX_REQUESTS_PER_MINUTE 5
+#define MAX_REQUESTS_PER_MINUTE 10
 #endif
 
 #ifndef SRV_LOG_FILE
