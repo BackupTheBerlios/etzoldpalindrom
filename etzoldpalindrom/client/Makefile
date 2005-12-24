@@ -1,7 +1,7 @@
-TARGETS = epal epal_static
+TARGETS = epal
 CXX     = g++
 INCS    = -I../lib -I..
-LIBS    = /usr/lib/libgmp.a -lpthread
+LIBS    = -lgmp -lpthread -lssl
 
 all: $(TARGETS)
 

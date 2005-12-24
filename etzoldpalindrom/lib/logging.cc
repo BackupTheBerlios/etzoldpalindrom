@@ -85,6 +85,7 @@ void logging::log( int level, const char* fmt, va_list ap ) {
 			if( _tostdout ) {
 				std::cout << filename << std::endl;
 			}
+			fflush( f );
 			fclose( f );
 		}
 	}

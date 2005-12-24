@@ -3,6 +3,7 @@
 #include <vector>
 #include <sstream>
 #include <unistd.h>
+#include <openssl/ssl.h>
 
 #include "libpal.hh"
 #include "settings.hh"
@@ -37,7 +38,7 @@ void write_config( const config_t& c );
 void loop( const config_t& c );
 bool parse_line( const std::string& s, data_t* d );
 std::string check( const data_t& data );
-void send_palindrom( int fd, const std::string& n, const std::string& id, int retries = 10 );
+void send_palindrom( const socket& sock, const std::string& n, const std::string& id, int retries = 10 );
 
 int main( int argc, char** argv ) {
 	config_t conf;
@@ -176,6 +177,7 @@ std::string check( const data_t& data ) {
 		mpz_mul( c, p, p );
 		mpz_get_str( tmp, 10, c );
 		if( is_palindrom( tmp ) && mpz_probab_prime_p( p, 10 ) > 0 ) {
+			mpz_get_str( tmp, 10, p );
 			r = tmp;
 			break;
 		}
@@ -187,12 +189,13 @@ std::string check( const data_t& data ) {
 	return r;
 }
 
-void send_palindrom( int fd, const std::string& n, const std::string& id, int retries ) {
+void send_palindrom( const socket& sock, const std::string& n, const std::string& id, int retries ) {
 	std::stringstream s;
 	std::string x;
 	compact( n, x );
+	std::cout << "found etzold palindrom: [ " << x << " ]^2" << std::endl;
 	s << "F " << CLIENT_VERSION << " [" << x << "] " << id;
-	while( ! send_line( fd, s.str() ) && retries-- ) {
+	while( ! sock.send_line( s.str() ) && retries-- ) {
 		sleep( 10 );
 	}
 }
@@ -201,19 +204,17 @@ void loop( const config_t& c ) {
 	std::string id;
 	std::string r;
 	while( true ) {
-		int fd;
-		if( ( fd = connect_socket( _srv.c_str(), _port, _ip ? false : true ) ) != -1 ) {
+		socket sock;
+		if( sock.connect_socket( _srv, _port, _ip ? false : true ) && sock.ssl_init() && sock.ssl() ) {
 			if( ! r.empty() ) {
-				send_palindrom( fd, r, id );
+				send_palindrom( sock, r, id );
 				r = "";
-				close( fd );
 			} else {
 				std::stringstream s;
 				std::string buf;
 				s << "G " << CLIENT_VERSION << " [" << c.nick << "]";
-				if( send_line( fd, s.str() ) && read_line( fd, buf ) ) {
+				if( sock.send_line( s.str() ) && sock.read_line( buf ) ) {
 					data_t data;
-					close( fd );
 					if( parse_line( buf, &data ) ) {
 						r = check( data );
 						id = data.id;
@@ -222,7 +223,6 @@ void loop( const config_t& c ) {
 						sleep( SRV_RETRY );
 					}
 				} else {
-					close( fd );
 					std::cerr << "Could not talk with server. Waiting some seconds ..." << std::endl;
 					sleep( SRV_RETRY );
 				}
@@ -231,6 +231,7 @@ void loop( const config_t& c ) {
 			std::cerr << "Connecting to server failed. Waiting some seconds ..." << std::endl;
 			sleep( SRV_RETRY );
 		}
+		sleep( 1 );
 	}
 }
 
