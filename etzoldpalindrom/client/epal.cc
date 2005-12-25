@@ -3,6 +3,7 @@
 #include <vector>
 #include <sstream>
 #include <unistd.h>
+#include <stdarg.h>
 #include <openssl/ssl.h>
 
 #include "libpal.hh"
@@ -10,12 +11,9 @@
 #include "socket.hh"
 #include "number_generator.hh"
 #include "args.hh"
-#include "sha2.hh"
-
-typedef struct {
-	std::string nick;
-	std::string pwd;
-} config_t;
+#include "srv.hh"
+#include "usr.hh"
+#include "types.hh"
 
 typedef struct {
 	std::string ip;
@@ -51,7 +49,7 @@ int main( int argc, char** argv ) {
 		_port = atoi( arg_value( argc, argv, "--port" ) );
 	}
 
-	std::cout << "etzoldpal " << _version << std::endl;
+	std::cout << "epal " << _version << std::endl;
 	read_config( conf );
 	std::cout << "using nick " << conf.nick << std::endl;
 
@@ -104,16 +102,6 @@ bool parse_line( const std::string& s, data_t* d ) {
 	return ret;
 }
 
-std::string hexdump( const unsigned char* data, int len ) {
-	std::string r;
-	char buf[ 3 ];
-	for( ; len > 0; --len, ++data ) {
-		snprintf( buf, 2, "%02x", *data );
-		r += buf;
-	}
-	return r;
-}
-
 void write_config( config_t& c ) {
 	std::ofstream f( CONFIG_FILE, std::ios::trunc );
 	if( ! f.is_open() || f.fail() ) {
@@ -122,25 +110,24 @@ void write_config( config_t& c ) {
 	}
 	f << "nick: " << c.nick << std::endl;
 	f << "pwd: " << c.pwd << std::endl;
+	f << "public: " << c.pub << std::endl;
+	f << "realname: " << c.realname << std::endl;
 }
 
 void read_config( config_t& c ) {
-	unsigned char dig[ SHA512_DIGEST_SIZE ];
 	std::ifstream f( CONFIG_FILE );
 	std::string s;
 	if( ! f.is_open() || f.fail() ) {
-		printf( 
-			"No configuration file was found.\n"
-			"Nick or real name: " );
-		fflush( stdout );
-		std::getline( std::cin, c.nick );
+		std::cout << "No configuration file was found." << std::endl;
 		do {
-			printf( "Password (at least 6 characters): " );
-			fflush( stdout );
+			std::cout << "Do you already have an account? [N/y] " << std::flush;
 			std::getline( std::cin, s );
-		} while( s.size() < 6 );
-		sha512( (unsigned char*) s.data(), s.size(), dig );
-		c.pwd = hexdump( dig, SHA512_DIGEST_SIZE );
+		} while( s != "n" && s != "y" && s != "N" && s != "Y" && ! s.empty() );
+		if( s == "y" || s == "Y" ) {
+			use_account( c );
+		} else {
+			register_account( c );
+		}
 		write_config( c );
 	} else {
 		while( std::getline( f, s ) ) {
@@ -153,6 +140,10 @@ void read_config( config_t& c ) {
 					c.nick = val;
 				} else if( key == "pwd" ) {
 					c.pwd = val;
+				} else if( key == "public" ) {
+					c.pub = val;
+				} else if( key == "realname" ) {
+					c.realname = val;
 				}
 			}
 		}

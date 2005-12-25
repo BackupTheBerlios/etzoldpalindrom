@@ -2,14 +2,15 @@ TARGETS = epal
 CXX     = g++
 INCS    = -I../lib -I..
 LIBS    = -lgmp -lpthread -lssl
+OBJS    = epal.o srv.o usr.o
 
 all: $(TARGETS)
 
-epal: epal.o ../lib/libpal.a
-	$(CXX) $< ../lib/libpal.a $(LIBS) -o $@
+epal: $(OBJS) ../lib/libpal.a
+	$(CXX) $(OBJS) ../lib/libpal.a $(LIBS) -o $@
 
-epal_static: epal.o ../lib/libpal.a
-	$(CXX) -static $< ../lib/libpal.a $(LIBS) -o $@
+epal_static: $(OBJS) ../lib/libpal.a
+	$(CXX) -static $(OBJS) ../lib/libpal.a $(LIBS) -o $@
 
 %.o: %.cc
 	$(CXX) -c -O2 $(INCS) $<
