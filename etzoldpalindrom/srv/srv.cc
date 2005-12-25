@@ -2,6 +2,7 @@
 #include <string>
 #include <sstream>
 #include <list>
+#include <vector>
 #include <map>
 #include <assert.h>
 #include <sys/types.h>
@@ -13,6 +14,7 @@
 #include "libpal.hh"
 #include "logging.hh"
 #include "settings.hh"
+#include "accounts.hh"
 
 #define INC_LENGTH( x ) ( x * 2 + 1 )
 
@@ -62,6 +64,24 @@ int get_next_fd( int sock ) {
 	return fd;
 }
 
+void send_answer( const socket& sock, int ret ) {
+	std::stringstream s;
+	s << ret;
+	sock.send_line( s.str() );
+}
+
+void send_answer( const socket& sock, int ret, int n, ... ) {
+	std::stringstream s;
+	va_list ap;
+	va_start( ap, n );
+	s << ret;
+	for( int i = 0; i < n; ++i ) {
+		s << " [" << va_arg( ap, char* ) << "]";
+	}
+	va_end( ap );
+	sock.send_line( s.str() );
+}
+
 void loop( int len, int soc ) {
 	mpz_t x;
 	mpz_init( x );
@@ -81,6 +101,34 @@ void loop( int len, int soc ) {
 				sock.read_line( s, 1024, 10 );
 				ip = sock.get_ip();
 				_log.notice( "rcv: [%s] on [%d], line [%s]", ip.c_str(), time( NULL ), s.c_str() );
+				std::vector< std::string > v;
+				split( s, v );
+				if( ! v.empty() && v[ 0 ].find_first_not_of( "0123456789" ) == std::string::npos ) {
+					switch( atoi( v[ 0 ].c_str() ) ) {
+						case CMD_NICK:
+							if( v.size() == 2 ) {
+								send_answer( sock, account_check_nick( v[ 1 ] ) );
+							} else {
+								send_answer( sock, RET_ERR );
+							}
+							break;
+						case CMD_REGISTER:
+							if( v.size() == 5 ) {
+								send_answer( sock, account_register( v[ 1 ], v[ 2 ], v[ 3 ], v[ 4 ] ) );
+							} else {
+								send_answer( sock, RET_ERR );
+							}
+							break;
+						case CMD_GET_CONFIG:
+							if( v.size() == 3 ) {
+								std::string realname, pub;
+								int r = account_get_config( v[ 1 ], v[ 2 ], realname, pub );
+								send_answer( sock, r, 2, realname.c_str(), pub.c_str() );
+							} else {
+								send_answer( sock, RET_ERR );
+							}
+					}
+				}
 				if( ! s.empty() ) {
 					switch( s[ 0 ] ) {
 						case 'F':      // client found an etzold palindrom
