@@ -51,7 +51,6 @@ primeexit:
 	return isprime;
 }
 
-
 bool is_prime( const char* p, int it ) {
 	return millerrabin( p, it );
 }
@@ -118,6 +117,35 @@ u_int32_t chksum( const std::string& s ) {
 	u_int32_t r = 0;
 	for( unsigned int i = 0; i < s.size(); ++i ) {
 		r = r * 5 + s[ i ];
+	}
+	return r;
+}
+
+void split( const std::string& s, std::vector< std::string >& v ) {
+	for( std::string::size_type i = 0; i < s.size(); ) {
+		if( s[ i ] == '[' ) {
+			v.push_back( s.substr( i, s.find( "]", i ) - i + 1 ) );
+			if( v.back().size() > 1 ) {
+				v.back().erase( 0, 1 );
+				v.back().erase( v.back().size() - 1 );
+			}
+			i = s.find( "]", i );
+		} else if( ! isspace( s[ i ] ) && s[ i ] != ']' ) {
+			v.push_back( s.substr( i, s.find( " ", i ) - i ) );
+			i = s.find( " ", i );
+		} else {
+			++i;
+		}
+	}
+
+}
+
+std::string hexdump( const unsigned char* data, int len ) {
+	std::string r;
+	char buf[ 3 ];
+	for( ; len > 0; --len, ++data ) {
+		snprintf( buf, 2, "%02x", *data );
+		r += buf;
 	}
 	return r;
 }

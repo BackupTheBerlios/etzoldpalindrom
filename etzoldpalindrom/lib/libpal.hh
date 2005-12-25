@@ -5,6 +5,8 @@
 #define DEFAULT_PRIME_ITERATIONS 10
 #endif
 
+#include <vector>
+#include <string>
 #include <sys/types.h>
 #include <gmp.h>
 
@@ -18,6 +20,8 @@ void compact( const std::string& p, std::string& out, const char* up = "^", cons
 void decompact( const std::string& p, std::string& d );
 
 u_int32_t chksum( const std::string& s );
+void split( const std::string& s, std::vector< std::string >& v );
+std::string hexdump( const unsigned char* data, int len );
 
 #endif
 
