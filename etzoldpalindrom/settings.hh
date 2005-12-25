@@ -41,4 +41,19 @@
 #define SRV_DATA_PATH "."
 #endif
 
+#ifndef DB_AUTH
+#define DB_AUTH "auth.db"
+#endif
+
+#define RET_OK            0
+#define RET_ERR           1
+#define RET_COMERR        2
+#define RET_NICKINUSE     3
+#define RET_INVALIDNICK   4
+#define RET_INVALIDLOGIN  5
+
+#define CMD_NICK          1
+#define CMD_REGISTER      2
+#define CMD_GET_CONFIG    3
+
 #endif
