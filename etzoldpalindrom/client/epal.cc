@@ -4,6 +4,7 @@
 #include <sstream>
 #include <unistd.h>
 #include <stdarg.h>
+#include <signal.h>
 #include <openssl/ssl.h>
 
 #include "libpal.hh"
@@ -15,17 +16,6 @@
 #include "usr.hh"
 #include "types.hh"
 
-typedef struct {
-	std::string ip;
-	time_t tim;
-	std::string version;
-	int n;
-	int len;
-	std::string number;
-	std::string id;
-	u_int32_t chksum;
-} data_t;
-
 std::string _version = CLIENT_VERSION;
 std::string _srv = SRV_ADDR;
 bool        _ip = false;
@@ -34,9 +24,7 @@ int         _port = SRV_PORT;
 void read_config( config_t& c );
 void write_config( const config_t& c );
 void loop( const config_t& c );
-bool parse_line( const std::string& s, data_t* d );
-std::string check( const data_t& data );
-void send_palindrom( const socket& sock, const std::string& n, const std::string& id, int retries = 10 );
+std::string check( const std::string& num, int n );
 
 int main( int argc, char** argv ) {
 	config_t conf;
@@ -53,6 +41,8 @@ int main( int argc, char** argv ) {
 	read_config( conf );
 	std::cout << "using nick " << conf.nick << std::endl;
 
+	signal( SIGPIPE, SIG_IGN );
+
 	if( ! arg_exists( argc, argv, "-f" ) ) {  // daemonize
 		pid_t p = fork();
 		if( p > 0 ) {
@@ -65,41 +55,6 @@ int main( int argc, char** argv ) {
 	}
 
 	loop( conf );
-}
-
-bool parse_line( const std::string& s, data_t* d ) {
-	bool ret = false;
-	std::vector< std::string > v;
-	for( std::string::size_type i = 0; i < s.size(); ) {
-		if( s[ i ] == '[' ) {
-			v.push_back( s.substr( i, s.find( "]", i ) - i + 1 ) );
-			if( v.back().size() > 1 ) {
-				v.back().erase( 0, 1 );
-				v.back().erase( v.back().size() - 1 );
-			}
-			i = s.find( "]", i );
-		} else if( ! isspace( s[ i ] ) && s[ i ] != ']' ) {
-			v.push_back( s.substr( i, s.find( " ", i ) - i ) );
-			i = s.find( " ", i );
-		} else {
-			++i;
-		}
-	}
-	if( ret = ( v.size() == 8 ) ) {
-		d->ip = v[ 0 ];
-		d->tim = atoi( v[ 1 ].c_str() );
-		d->version = v[ 2 ];
-		d->n = atoi( v[ 3 ].c_str() );
-		d->len = atoi( v[ 4 ].c_str() );
-		d->number = v[ 5 ];
-		d->id = v[ 6 ];
-		d->chksum = atoll( v[ 7 ].c_str() );
-
-		std::string x( s );
-		x.erase( x.find_last_of( " " ) );
-		ret = ( d->chksum == chksum( x ) );
-	}
-	return ret;
 }
 
 void write_config( config_t& c ) {
@@ -150,13 +105,13 @@ void read_config( config_t& c ) {
 	}
 }
 
-std::string check( const data_t& data ) {
+std::string check( const std::string& number, int n ) {
 	std::string r;
 	std::string num;
 	char* tmp;
 	mpz_t c, p;
 	
-	decompact( data.number, num );
+	decompact( number, num );
 	mpz_init_set_str( p, num.c_str(), 10 );
 	mpz_init( c );
 
@@ -164,7 +119,7 @@ std::string check( const data_t& data ) {
 	mpz_init_set_str( p, num.c_str(), 10 );
 
 	tmp = new char[ 2 * num.size() + 128 ];
-	for( int n = 0; n < data.n; ++n ) {
+	for( ; n; --n ) {
 		mpz_mul( c, p, p );
 		mpz_get_str( tmp, 10, c );
 		if( is_palindrom( tmp ) && mpz_probab_prime_p( p, 10 ) > 0 ) {
@@ -180,46 +135,34 @@ std::string check( const data_t& data ) {
 	return r;
 }
 
-void send_palindrom( const socket& sock, const std::string& n, const std::string& id, int retries ) {
-	std::stringstream s;
-	std::string x;
-	compact( n, x );
-	std::cout << "found etzold palindrom: [ " << x << " ]^2" << std::endl;
-	s << "F " << CLIENT_VERSION << " [" << x << "] " << id;
-	while( ! sock.send_line( s.str() ) && retries-- ) {
-		sleep( 10 );
-	}
-}
+/*
+CMD_GET_JOB [nick]
+ - ret [startnum] [n] [id]
+
+CMD_PALINDROM [nick] [pal] [id]
+ - ret
+*/
 
 void loop( const config_t& c ) {
-	std::string id;
-	std::string r;
-	while( true ) {
-		socket sock;
-		if( sock.connect_socket( _srv, _port, _ip ? false : true ) && sock.ssl_init() && sock.ssl() ) {
-			if( ! r.empty() ) {
-				send_palindrom( sock, r, id );
-				r = "";
-			} else {
-				std::stringstream s;
-				std::string buf;
-				s << "G " << CLIENT_VERSION << " [" << c.nick << "]";
-				if( sock.send_line( s.str() ) && sock.read_line( buf ) ) {
-					data_t data;
-					if( parse_line( buf, &data ) ) {
-						r = check( data );
-						id = data.id;
-					} else {
-						std::cerr << "Got corrupt data. Waiting some seconds ..." << std::endl;
-						sleep( SRV_RETRY );
-					}
-				} else {
-					std::cerr << "Could not talk with server. Waiting some seconds ..." << std::endl;
+	while( 1 ) {
+		std::vector< std::string > v;
+		int r;
+		if( ( r = send_cmd( CMD_GET_JOB, v, 1, c.nick.c_str() ) ) == RET_OK ) {
+			std::string p = check( v[ 0 ], atoi( v[ 1 ].c_str() ) );
+			if( ! p.empty() ) { // found palindrom
+				compact( p, p );
+				std::cout << "found palindrom [" << p << "]^2" << std::endl;
+				for( int i = 0; i < 30 && send_cmd( CMD_PALINDROM, 3, c.nick.c_str(), 
+						p.c_str(), v[ 2 ].c_str() ) != RET_OK; ++i ) {
+					std::cerr << "Could not sent palindrom. Waiting some seconds ..." << std::endl;
 					sleep( SRV_RETRY );
 				}
 			}
+		} else if( r == RET_TOO_MANY_REQUESTS ) {
+			std::cerr << "Too many requests. Waiting some seconds ..." << std::endl;
+			sleep( SRV_RETRY );
 		} else {
-			std::cerr << "Connecting to server failed. Waiting some seconds ..." << std::endl;
+			std::cerr << "Could not talk with server. Waiting some seconds ..." << std::endl;
 			sleep( SRV_RETRY );
 		}
 		sleep( 1 );

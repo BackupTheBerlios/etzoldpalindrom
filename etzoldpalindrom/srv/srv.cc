@@ -7,6 +7,7 @@
 #include <assert.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <signal.h>
 
 #include "socket.hh"
 #include "number_generator.hh"
@@ -34,10 +35,15 @@ int main( int argc, char** argv ) {
 	if( arg_exists( argc, argv, "--datapath" ) ) {
 		_data_path = arg_value( argc, argv, "--datapath" );
 	}
+	if( arg_exists( argc, argv, "--logpath" ) ) {
+		_log.set_path( arg_value( argc, argv, "--logpath" ) );
+	}
 
 	_data_path += "/";
 	srand( time( NULL ) );
 	int sock = init_socket( SRV_PORT );
+
+	signal( SIGPIPE, SIG_IGN );
 
 	if( ! arg_exists( argc, argv, "-f" ) ) {
 		pid_t p = fork();
@@ -50,18 +56,6 @@ int main( int argc, char** argv ) {
 	}
 
 	loop( len, sock );
-}
-
-int get_next_fd( int sock ) {
-	int fd;
-	while( true ) {
-		assert( ( fd = accept_socket( sock ) ) != -1 );
-		if( check_ip( socket::get_ip( fd ) ) ) {
-			break;
-		}
-		close( fd );
-	}
-	return fd;
 }
 
 void send_answer( const socket& sock, int ret ) {
@@ -82,6 +76,68 @@ void send_answer( const socket& sock, int ret, int n, ... ) {
 	sock.send_line( s.str() );
 }
 
+int get_next_fd( int sock ) {
+	int fd;
+	while( true ) {
+		assert( ( fd = accept_socket( sock ) ) != -1 );
+		if( check_ip( socket::get_ip( fd ) ) ) {
+			break;
+		}
+		socket s( fd );
+		if( s.ssl_init( false ) && s.ssl() ) {
+			send_answer( s, RET_TOO_MANY_REQUESTS );
+		}
+	}
+	return fd;
+}
+
+void check_command( const socket& sock, const std::vector< std::string >& v, mpz_t x, char* tmp ) {
+	if( ! ( v.size() > 1 && v[ 0 ].find_first_not_of( "0123456789." ) == std::string::npos &&
+			v[ 1 ].find_first_not_of( "0123456789" ) == std::string::npos ) ) {
+		return;
+	}
+	if( v[ 0 ] != "1.0" ) {
+		send_answer( sock, RET_INVALID_VERSION );
+	}
+	switch( atoi( v[ 1 ].c_str() ) ) {
+		case CMD_NICK:
+			if( v.size() == 3 ) {
+				send_answer( sock, account_check_nick( v[ 2 ] ) );
+				return;
+			}
+		case CMD_REGISTER:
+			if( v.size() == 6 ) {
+				send_answer( sock, account_register( v[ 2 ], v[ 3 ], v[ 4 ], v[ 5 ] ) );
+				return;
+			}
+		case CMD_GET_CONFIG:
+			if( v.size() == 4 ) {
+				std::string realname, pub;
+				int r = account_get_config( v[ 2 ], v[ 3 ], realname, pub );
+				send_answer( sock, r, 2, realname.c_str(), pub.c_str() );
+				return;
+			}
+		case CMD_PALINDROM:
+			if( v.size() == 5 ) {
+				_log.notice( "got palindrom: [%s], nick [%s], id [%s]", v[ 3 ].c_str(),
+					v[ 2 ].c_str(), v[ 4 ].c_str() );
+				send_answer( sock, RET_OK );
+				return;
+			}
+		case CMD_GET_JOB:
+			std::string id = get_id();
+			std::string s;
+			std::stringstream n;
+			n << NUMBERS;
+			mpz_get_str( tmp, 10, x );
+			compact( tmp, s );
+			send_answer( sock, RET_OK, 3, s.c_str(), n.str().c_str(), id.c_str() );
+			_log.notice( "snd: [%s], nick [%s], id [%s]", s.c_str(), v[ 1 ].c_str(), id.c_str() );
+			return;
+	}
+	send_answer( sock, RET_ERR );
+}
+
 void loop( int len, int soc ) {
 	mpz_t x;
 	mpz_init( x );
@@ -100,56 +156,15 @@ void loop( int len, int soc ) {
 			if( sock.ssl() ) {
 				sock.read_line( s, 1024, 10 );
 				ip = sock.get_ip();
-				_log.notice( "rcv: [%s] on [%d], line [%s]", ip.c_str(), time( NULL ), s.c_str() );
+				_log.notice( "rcv: [%s] line [%s]", ip.c_str(), s.c_str() );
 				std::vector< std::string > v;
 				split( s, v );
-				if( ! v.empty() && v[ 0 ].find_first_not_of( "0123456789" ) == std::string::npos ) {
-					switch( atoi( v[ 0 ].c_str() ) ) {
-						case CMD_NICK:
-							if( v.size() == 2 ) {
-								send_answer( sock, account_check_nick( v[ 1 ] ) );
-							} else {
-								send_answer( sock, RET_ERR );
-							}
-							break;
-						case CMD_REGISTER:
-							if( v.size() == 5 ) {
-								send_answer( sock, account_register( v[ 1 ], v[ 2 ], v[ 3 ], v[ 4 ] ) );
-							} else {
-								send_answer( sock, RET_ERR );
-							}
-							break;
-						case CMD_GET_CONFIG:
-							if( v.size() == 3 ) {
-								std::string realname, pub;
-								int r = account_get_config( v[ 1 ], v[ 2 ], realname, pub );
-								send_answer( sock, r, 2, realname.c_str(), pub.c_str() );
-							} else {
-								send_answer( sock, RET_ERR );
-							}
-					}
-				}
-				if( ! s.empty() ) {
-					switch( s[ 0 ] ) {
-						case 'F':      // client found an etzold palindrom
-							sock.close();
-							break;
-						case 'G':
-							mpz_get_str( tmp, 10, x );
-							compact( tmp, s );
-							std::stringstream out;
-							out << ip << " " << time( NULL ) << " 1.0 " << NUMBERS << " " << len << " [" << s << "] " << get_id();
-							u_int32_t chk = chksum( out.str() );
-							out << " " << chk;
-							_log.notice( "snd: [%s]", out.str().c_str() );
-							sock.send_line( out.str() );
-					}
-				}
+				check_command( sock, v, x, tmp );
 			} else {
 				_log.error( "ssl failed [%s] on [%d]", ip.c_str(), time( NULL ) );
 			}
 			sock.close();
-			_log.debug( "close connection [%s] on [%d]", ip.c_str(), time( NULL ) );
+			_log.debug( "close connection [%s]", ip.c_str() );
 		} while( ! gen.next_number( x, NUMBERS ) );
 		delete[] tmp;
 	}

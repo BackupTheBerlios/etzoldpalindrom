@@ -14,7 +14,8 @@ int send_cmd( const std::string& s, std::string& r ) {
 	int ret = RET_COMERR;
 	socket sock;
 	if( sock.connect_socket( _srv, _port, _ip ? false : true ) && sock.ssl_init() && sock.ssl() ) {
-		if( sock.send_line( s ) && sock.read_line( buf ) && ! buf.empty() ) {
+		sock.send_line( s );
+		if( sock.read_line( buf ) && ! buf.empty() ) {
 			std::string::size_type p = buf.find( " " );
 			std::string rx = buf.substr( 0, p );
 			if( ! rx.empty() && rx.find_first_not_of( "0123456789" ) == std::string::npos ) {
@@ -35,7 +36,7 @@ int send_cmd( int cmd, int n, ... ) {
 	std::string buf;
 	va_list ap;
 	va_start( ap, n );
-	s << cmd;
+	s << CLIENT_VERSION << " " << cmd;
 	for( int i = 0; i < n; ++i ) {
 		s << " [" << va_arg( ap, char* ) << "]";
 	}
@@ -49,7 +50,7 @@ int send_cmd( int cmd, std::vector< std::string >& resp, int n, ... ) {
 	int r;
 	va_list ap;
 	va_start( ap, n );
-	s << cmd;
+	s << CLIENT_VERSION << " " << cmd;
 	for( int i = 0; i < n; ++i ) {
 		s << " [" << va_arg( ap, char* ) << "]";
 	}
