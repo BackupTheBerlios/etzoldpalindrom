@@ -1,5 +1,6 @@
 #include <iostream>
 #include <assert.h>
+#include <unistd.h>
 #include <pthread.h>
 #include "libpal.hh"
 #include "number_generator.hh"
