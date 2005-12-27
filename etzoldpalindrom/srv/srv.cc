@@ -133,7 +133,7 @@ bool check_command( const socket& sock, const std::vector< std::string >& v, mpz
 			mpz_get_str( tmp, 10, x );
 			compact( tmp, s );
 			send_answer( sock, RET_OK, 3, s.c_str(), n.str().c_str(), id.c_str() );
-			_log.notice( "snd: [%s], nick [%s], id [%s]", s.c_str(), v[ 1 ].c_str(), id.c_str() );
+			_log.notice( "snd: [%s], nick [%s], id [%s]", s.c_str(), v[ 2 ].c_str(), id.c_str() );
 			return false;
 	}
 	send_answer( sock, RET_ERR );

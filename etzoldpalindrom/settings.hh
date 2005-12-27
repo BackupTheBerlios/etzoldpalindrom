@@ -30,7 +30,7 @@
 #endif
 
 #ifndef MAX_REQUESTS_PER_MINUTE
-#define MAX_REQUESTS_PER_MINUTE 5
+#define MAX_REQUESTS_PER_MINUTE 30
 #endif
 
 #ifndef SRV_LOG_FILE
