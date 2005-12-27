@@ -159,7 +159,6 @@ void loop( const config_t& c ) {
 				}
 			}
 		} else if( r == RET_TOO_MANY_REQUESTS ) {
-			std::cerr << "Too many requests. Waiting some seconds ..." << std::endl;
 			sleep( SRV_RETRY );
 		} else {
 			std::cerr << "Could not talk with server. Waiting some seconds ..." << std::endl;

@@ -6,7 +6,7 @@
 #endif
 
 #ifndef SRV_ADDR
-#define SRV_ADDR "dzdev"
+#define SRV_ADDR "etzoldpalindrom.ath.cx"
 #endif
 
 #ifndef SRV_RETRY
@@ -14,7 +14,7 @@
 #endif
 
 #ifndef CLIENT_VERSION
-#define CLIENT_VERSION "1.0"
+#define CLIENT_VERSION "0.0.1"
 #endif
 
 #ifndef CONFIG_FILE

@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include <string>
 #include <sstream>
 #include <list>
@@ -91,38 +92,38 @@ int get_next_fd( int sock ) {
 	return fd;
 }
 
-void check_command( const socket& sock, const std::vector< std::string >& v, mpz_t x, char* tmp ) {
+bool check_command( const socket& sock, const std::vector< std::string >& v, mpz_t x, char* tmp ) {
 	if( ! ( v.size() > 1 && v[ 0 ].find_first_not_of( "0123456789." ) == std::string::npos &&
 			v[ 1 ].find_first_not_of( "0123456789" ) == std::string::npos ) ) {
-		return;
+		return false;
 	}
-	if( v[ 0 ] != "1.0" ) {
+	if( v[ 0 ] != "0.0.1" ) {
 		send_answer( sock, RET_INVALID_VERSION );
 	}
 	switch( atoi( v[ 1 ].c_str() ) ) {
 		case CMD_NICK:
 			if( v.size() == 3 ) {
 				send_answer( sock, account_check_nick( v[ 2 ] ) );
-				return;
+				return false;
 			}
 		case CMD_REGISTER:
 			if( v.size() == 6 ) {
 				send_answer( sock, account_register( v[ 2 ], v[ 3 ], v[ 4 ], v[ 5 ] ) );
-				return;
+				return false;
 			}
 		case CMD_GET_CONFIG:
 			if( v.size() == 4 ) {
 				std::string realname, pub;
 				int r = account_get_config( v[ 2 ], v[ 3 ], realname, pub );
 				send_answer( sock, r, 2, realname.c_str(), pub.c_str() );
-				return;
+				return false;
 			}
 		case CMD_PALINDROM:
 			if( v.size() == 5 ) {
 				_log.notice( "got palindrom: [%s], nick [%s], id [%s]", v[ 3 ].c_str(),
 					v[ 2 ].c_str(), v[ 4 ].c_str() );
 				send_answer( sock, RET_OK );
-				return;
+				return true;
 			}
 		case CMD_GET_JOB:
 			std::string id = get_id();
@@ -133,25 +134,62 @@ void check_command( const socket& sock, const std::vector< std::string >& v, mpz
 			compact( tmp, s );
 			send_answer( sock, RET_OK, 3, s.c_str(), n.str().c_str(), id.c_str() );
 			_log.notice( "snd: [%s], nick [%s], id [%s]", s.c_str(), v[ 1 ].c_str(), id.c_str() );
-			return;
+			return false;
 	}
 	send_answer( sock, RET_ERR );
+	return false;
+}
+
+void store_number( mpz_t x, char* tmp ) {
+	mpz_get_str( tmp, 10, x );
+	std::ofstream f( ( _data_path + "lastnumber" ).c_str(), std::ios::trunc );
+	if( ! f.is_open() || f.fail() ) {
+		_log.error( "could not open file lastnumber for writing" );
+		return;
+	}
+	std::string s;
+	compact( tmp, s );
+	f << s;
+}
+
+std::string read_number() {
+	std::string s;
+	std::ifstream f( ( _data_path + "lastnumber" ).c_str() );
+	if( ! f.is_open() || f.fail() ) {
+		_log.notice( "could not open file lastnumber for reading" );
+		return s;
+	}
+	std::getline( f, s );
+	_log.notice( "continue with number [%s]", s.c_str() );
+	decompact( s, s );
+	return s;
 }
 
 void loop( int len, int soc ) {
-	mpz_t x;
-	mpz_init( x );
-	_log.notice( "listening on port [%d] ...", SRV_PORT );
+	std::string s;
+	number_generator* gen = NULL;
 	socket sock;
+	mpz_t x;
+
+	_log.notice( "listening on port [%d] ...", SRV_PORT );
+	mpz_init( x );
 	sock.ssl_init( false );
+	s = read_number();
+	if( ! s.empty() ) {
+		gen = new number_generator( s );
+		mpz_set_str( x, s.c_str(), 10 );
+		len = s.size();
+	}
 	for( ; ; len = INC_LENGTH( len ) ) {
 		_log.notice( "len = [%d]", len );
-		number_generator gen( len );
-		gen.first_number( x );
-
+		if( ! gen ) {
+			gen = new number_generator( len );
+			gen->first_number( x );
+		}
 		char* tmp = new char[ len + 128 ];
 		do {
-			std::string s, ip;
+			store_number( x, tmp );
+			std::string ip;
 			sock.set_fd( get_next_fd( soc ) );
 			if( sock.ssl() ) {
 				sock.read_line( s, 1024, 10 );
@@ -159,14 +197,18 @@ void loop( int len, int soc ) {
 				_log.notice( "rcv: [%s] line [%s]", ip.c_str(), s.c_str() );
 				std::vector< std::string > v;
 				split( s, v );
-				check_command( sock, v, x, tmp );
+				if( check_command( sock, v, x, tmp ) ) {
+					break;
+				}
 			} else {
 				_log.error( "ssl failed [%s] on [%d]", ip.c_str(), time( NULL ) );
 			}
 			sock.close();
 			_log.debug( "close connection [%s]", ip.c_str() );
-		} while( ! gen.next_number( x, NUMBERS ) );
+		} while( ! gen->next_number( x, NUMBERS ) );
 		delete[] tmp;
+		delete gen;
+		gen = NULL;
 	}
 }
 
